@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environmental War: Ukraine (2014-2026)</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --bg-base: #0d0d0d;
+            --bg-panel: #111111;
+            --bg-card: #1a1a1a;
+            --text-main: #f0f0f0;
+            --text-muted: #999999;
+            --accent: #ffffff;
+            --border: #333333;
+            --transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            --z-map: 1;
+            --z-ui: 1000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'IBM Plex Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body, html {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-base);
+            color: var(--text-main);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+
+        #map {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: var(--z-map);
+            background: var(--bg-base);
+            cursor: default;
+        }
+
+        .top-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: var(--z-ui);
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: 0.2s ease;
+        }
+
+        button:hover { background: #2a2a2a; }
+        button.active { background: #444; color: #fff; border-color: #666; }
+
+        kbd {
+            font-family: 'IBM Plex Sans', monospace;
+            background: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 10px;
+            margin-left: 6px;
+            color: #ccc;
+            font-weight: 400;
+            box-shadow: 0 1px 0 #111;
+        }
+
+        /* Left Panel */
+        #left-panel {
+            position: absolute;
+            top: 0; left: 0;
+            width: 300px;
+            height: calc(100vh - 75px);
+            background: rgba(17, 17, 17, 0.92);
+            backdrop-filter: blur(10px);
+            z-index: var(--z-ui);
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+            transition: transform var(--transition);
+        }
+
+        .logo { font-size: 20px; font-weight: 600; margin-bottom: 24px; color: #fff; }
+        .section-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin: 24px 0 12px; letter-spacing: 0.5px; }
+        
+        .cat-chip {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: #222;
+            margin-bottom: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s ease;
+            border: 1px solid transparent;
+            opacity: 0.5;
+        }
+        .cat-chip.active { opacity: 1; background: var(--bg-card); }
+        .cat-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
+        
+        .quick-btns { display: flex; gap: 8px; margin-bottom: 16px; }
+        .quick-btns button { flex: 1; padding: 4px; font-size: 12px; }
+
+        .slider-group { margin-bottom: 16px; }
+        .slider-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: transparent;
+            margin: 6px 0;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; background: #333; border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: #fff; cursor: pointer; margin-top: -6px; border: 2px solid #111;
+        }
+
+        /* Right Panel - Hidden by default */
+        #right-panel {
+            position: absolute;
+            top: 20px; right: 20px;
+            width: 320px;
+            max-height: calc(100vh - 110px);
+            background: rgba(17, 17, 17, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: var(--z-ui);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            
+            /* Hidden state */
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(20px);
+            transition: transform var(--transition), opacity var(--transition);
+        }
+
+        #right-panel.active-panel {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(0);
+        }
+
+        #event-details { display: block; }
+        .event-year { font-size: 14px; color: var(--text-muted); margin: 10px 0 4px; }
+        .event-name { font-size: 20px; font-weight: 600; line-height: 1.3; margin-bottom: 16px; }
+        .event-desc { font-size: 14px; line-height: 1.5; color: #ccc; margin-bottom: 20px; }
+        
+        .sources-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin: 24px 0 12px; letter-spacing: 0.5px; border-top: 1px solid var(--border); padding-top: 16px; }
+        .source-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+        .source-item { background: #222; border-radius: 6px; padding: 10px; font-size: 12px; border: 1px solid var(--border); transition: 0.2s ease; }
+        .source-item:hover { border-color: #555; background: #2a2a2a; }
+        .source-item a { color: #6daae0; text-decoration: none; font-weight: 500; display: block; margin-bottom: 4px; line-height: 1.3;}
+        .source-item a:hover { color: #fff; }
+        .source-pub { color: #999; font-size: 11px; }
+
+        .back-btn { 
+            width: 100%; padding: 10px; border-radius: 6px; border: none; background: #222; color: #fff; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 500;
+        }
+        .back-btn:hover { background: #333; }
+        .back-btn span.arrow { font-size: 16px; line-height: 1; margin-top: -2px; }
+
+        /* Footer Credits */
+        #footer-credits {
+            position: absolute;
+            bottom: 85px; 
+            left: 320px; 
+            z-index: var(--z-ui);
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            line-height: 1.4;
+            pointer-events: none; 
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        .footer-link {
+            color: rgba(255, 255, 255, 0.5);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            font-weight: 500;
+            transition: color 0.3s ease;
+            pointer-events: auto; 
+        }
+        .footer-link:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .footer-author {
+            font-size: 10px;
+            opacity: 0.7;
+            display: block;
+            margin-top: 2px;
+        }
+
+        /* Bottom Timeline Bar */
+        #bottom-timeline {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100vw;
+            height: 75px; 
+            background: #0d0d0d;
+            border-top: 1px solid var(--border);
+            z-index: var(--z-ui);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .timeline-controls { display: flex; gap: 6px; margin-right: 20px; align-items: center;}
+        .timeline-controls button { padding: 6px 10px; font-size: 14px; background: #222; border: none; display: flex; align-items: center; }
+        .timeline-controls button:hover { background: #444; }
+
+        .timeline-track-wrapper { 
+            position: relative; flex-grow: 1; height: 50px; margin-top: 10px; margin-right: 20px; cursor: pointer;
+            user-select: none;
+            touch-action: none;
+        }
+        .timeline-axis { position: absolute; top: 20px; width: 100%; height: 2px; background: #333; pointer-events: none;}
+        .timeline-year-lbl { position: absolute; top: 32px; font-size: 11px; color: var(--text-muted); transform: translateX(-50%); white-space: nowrap; pointer-events: none;}
+        
+        .playhead {
+            position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
+            left: 0; pointer-events: none; z-index: 10;
+        }
+        .playhead::after {
+            content: ''; position: absolute; top: 16px; left: -4px; width: 10px; height: 10px;
+            background: #fff; border-radius: 50%;
+        }
+        .playhead::before {
+            content: attr(data-year); position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+            background: var(--bg-card); color: #fff; padding: 2px 6px; font-size: 10px;
+            border-radius: 4px; border: 1px solid var(--border); white-space: nowrap;
+        }
+
+        .timeline-dot {
+            position: absolute; top: 18px; width: 6px; height: 6px;
+            border-radius: 50%; transform: translateX(-50%); pointer-events: none;
+        }
+
+        .speed-controls { display: flex; gap: 4px; }
+        .speed-controls button { padding: 4px 8px; font-size: 11px; background: transparent; border: 1px solid #333; }
+        .speed-controls button.active { background: #444; border-color: #666; }
+
+        /* Animations & Quality improvements for markers */
+        .map-marker {
+            animation: marker-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            transform-origin: center; transform-box: fill-box;
+            cursor: pointer;
+            filter: drop-shadow(0px 2px 5px rgba(0,0,0,0.6));
+        }
+        @keyframes marker-pop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .timeline-ripple {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none;
+            animation: ripple-out 1s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+        @keyframes ripple-out { 0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; } 100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; } }
+
+        .custom-toast {
+            pointer-events: none !important; display: flex; justify-content: center; align-items: flex-end; overflow: visible; z-index: 9999 !important;
+        }
+        .toast-content {
+            position: absolute; background: rgba(17,17,17,0.85); backdrop-filter: blur(5px);
+            padding: 8px 14px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+            border: 1px solid #444; width: max-content; max-width: 220px; text-align: center;
+            animation: toast-anim 2.5s cubic-bezier(0.2,0.8,0.2,1) forwards;
+        }
+        .toast-title { font-size: 12px; font-weight: 600; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .toast-cat { font-size: 11px; color: #aaa; }
+        
+        @keyframes toast-anim {
+            0% { opacity: 0; transform: scale(0.9); bottom: 0px; }
+            12% { opacity: 1; transform: scale(1); bottom: 25px; }
+            85% { opacity: 1; transform: scale(1); bottom: 25px; }
+            100% { opacity: 0; transform: scale(0.9); bottom: 40px; }
+        }
+
+        .pulse-ring {
+            box-sizing: border-box; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border-radius: 50%; animation: ambient-pulse 2s infinite, fade-in 1s ease forwards;
+            pointer-events: none !important; opacity: 0;
+        }
+        @keyframes ambient-pulse { 0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; } 50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.3; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; } }
+        @keyframes fade-in { to { opacity: 1; } }
+
+        .max-ring {
+            box-sizing: border-box; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none !important; animation: fade-in 1s ease forwards; opacity: 0;
+        }
+
+        /* Mobile Responsive */
+        .mobile-toggle { display: none; position: absolute; top: 20px; left: 20px; z-index: 1001; padding: 8px 12px; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--border); color: #fff;}
+        @media(max-width: 768px) {
+            .mobile-toggle { display: block; }
+            .top-controls { top: 20px; right: 20px; flex-direction: column; }
+            kbd { display: none; } 
+            
+            .leaflet-control-zoom { display: none !important; }
+
+            #left-panel { transform: translateX(-100%); padding-top: 60px; width: 280px; }
+            #left-panel.open { transform: translateX(0); }
+            
+            #right-panel {
+                top: auto; bottom: 70px; left: 0; right: 0; width: 100%; max-height: 50vh;
+                border-radius: 12px 12px 0 0; border: none; border-top: 1px solid var(--border);
+                transform: translateY(100%); opacity: 0; padding: 16px;
+            }
+            #right-panel.active-panel {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            #footer-credits { left: 10px; bottom: 80px; font-size: 11px; }
+
+            #bottom-timeline { padding: 0 5px; height: 70px; }
+            .speed-controls { display: none; }
+            .timeline-controls { margin-right: 5px; gap: 4px; }
+            .timeline-controls button { font-size: 12px; padding: 4px 6px; }
+            .timeline-track-wrapper { margin-right: 5px; }
+
+            .hide-mobile { display: none !important; }
+        }
+
+        .leaflet-control-attribution { display: none; }
+    </style>
+</head>
+<body>
+
+    <button class="mobile-toggle" id="btn-menu" onclick="toggleMenu()">☰ Menu</button>
+
+    <div class="top-controls">
+        <button id="btn-basemap">Dark / Satellite</button>
+        <div>
+            <button id="btn-ua" onclick="setLang('ua')">UA</button>
+            <button id="btn-en" onclick="setLang('en')" class="active">EN</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="footer-credits">
+        © <a href="https://livingthewar.media/" target="_blank" class="footer-link">Living the War</a>, 2026 · Open-source data<br>
+        <span class="footer-author">Developed by Shyshatskyi Taras</span>
+    </div>
+
+    <div id="left-panel">
+        <div class="logo" id="ui-title">Environmental War</div>
+        
+        <div class="section-title" id="ui-filter-cats">Categories</div>
+        <div class="quick-btns">
+            <button onclick="setAllCats(true)" id="ui-all">All</button>
+            <button onclick="setAllCats(false)" id="ui-none">None</button>
+        </div>
+        <div id="cat-list"></div>
+
+        <div class="section-title" id="ui-filter-year">Year Range</div>
+        <div class="slider-group">
+            <div class="slider-label">
+                <span id="ui-year-min">Start Year</span>
+                <span id="year-min-val">2014</span>
+            </div>
+            <input type="range" id="year-min" min="2014" max="2026" value="2014" oninput="updatePanelFilters()">
+            
+            <div class="slider-label" style="margin-top:10px;">
+                <span id="ui-year-max">End Year</span>
+                <span id="year-max-val">2026</span>
+            </div>
+            <input type="range" id="year-max" min="2014" max="2026" value="2026" oninput="updatePanelFilters()">
+        </div>
+    </div>
+
+    <div id="right-panel">
+        <div id="event-details">
+            <div class="cat-chip" id="det-cat" style="display: inline-flex; pointer-events: none; opacity: 1;">
+                <div class="cat-dot" id="det-dot"></div>
+                <span id="det-cat-name">Category</span>
+            </div>
+            <div class="event-year" id="det-year">2022</div>
+            <div class="event-name" id="det-name">Event Name</div>
+            
+            <div class="event-desc" id="det-desc">Description goes here...</div>
+
+            <div id="det-sources-container" style="display: none;">
+                <div class="sources-title" id="ui-sources-title">SOURCES</div>
+                <div class="source-list" id="det-sources"></div>
+            </div>
+
+            <button class="back-btn" onclick="closeDetails()"><span class="arrow">←</span> <span id="ui-back">Back to Overview</span></button>
+        </div>
+    </div>
+
+    <div id="bottom-timeline">
+        <div class="timeline-controls">
+            <button id="tl-reset" onclick="resetTimeline()" title="Reset (R)">↺ <kbd>R</kbd></button>
+            <button id="tl-prev" onclick="prevEvent()" title="Previous Event">⏮ <kbd>←</kbd></button>
+            <button id="tl-play" onclick="togglePlay()" title="Play/Pause" style="min-width: 80px; justify-content:center;"><span id="tl-play-icon">▶</span> <kbd>Space</kbd></button>
+            <button id="tl-next" onclick="nextEvent()" title="Next Event">⏭ <kbd>→</kbd></button>
+        </div>
+        
+        <div class="timeline-track-wrapper" id="tl-track" onmousedown="seekTimelineStart(event)" ontouchstart="seekTimelineStart(event)">
+            <div class="timeline-axis"></div>
+            <div class="playhead" id="tl-playhead" data-year="Jan 2014"></div>
+        </div>
+        
+        <div class="speed-controls">
+            <button id="spd-05" onclick="setSpeed(0.5)">×0.5</button>
+            <button id="spd-1" class="active" onclick="setSpeed(1)">×1</button>
+            <button id="spd-2" onclick="setSpeed(2)">×2</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+    <script>
+        const csvData = `name,name_ua,latitude,longitude,year,category,category_ua,score,description_en,description_ua
+"Seizure of Crimean Nature Reserves","Захоплення кримських заповідників",44.9521,34.1024,2014,"Protected Areas","Заповідні території",33,"When Russia illegally annexed Crimea, it simultaneously seized the peninsula's entire protected area network without legal basis, including unique endemic ecosystems.","Коли Росія незаконно анексувала Крим, вона захопила всю мережу природоохоронних територій півострова."
+"Blockage of the North Crimean Canal","Блокування Північно-Кримського каналу",46.136,33.640,2014,"Water Supply","Водопостачання",31,"Ukraine blocked the canal supplying 85% of Crimea's fresh water. Russia's unauthorized artesian drilling led to massive soil salinization.","Україна перекрила канал. Несанкціоноване буріння Росією призвело до масштабного засолення ґрунтів."
+"Flooding of Donbas Coal Mines","Затоплення вугільних шахт Донбасу",48.223,38.275,2014,"Water Supply","Водопостачання",37,"Abandoned coal mines flooded, mixing with toxic and radioactive materials (Mine Yunkom), threatening the Siverskyi Donets basin.","Затоплення покинутих шахт призвело до потрапляння токсичних та радіоактивних речовин у підземні води."
+"Halt of Tolyatti–Odesa Ammonia Pipeline","Зупинка аміакопроводу Тольятті–Одеса",48.333,38.090,2014,"Chemical & Industrial","Хімічна та промислова",23,"Suspension of the massive ammonia pipeline turned it into a latent environmental hazard across the conflict zone.","Зупинка аміакопроводу перетворила його на приховану екологічну загрозу в зоні конфлікту."
+"Shelling of Donetsk Filtration Station","Обстріл Донецької фільтрувальної станції",48.136,37.795,2017,"Water Supply","Водопостачання",27,"Repeated shelling of water purification infrastructure risked massive chlorine release.","Неодноразові обстріли фільтрувальної станції створювали ризик масштабного витоку хлору."
+"Massive Wildfires in Luhansk Region","Масштабні пожежі на Луганщині",48.800,39.000,2020,"Wildfires","Пожежі",31,"Fires triggered by shelling burned 25,000 ha. Firefighters were blocked from accessing the grey zone.","Пожежі від обстрілів знищили 25 000 га. Доступ пожежників до сірої зони був заблокований."
+"Seizure of Chornobyl NPP","Захоплення Чорнобильської АЕС",51.389,30.099,2022,"Nuclear & Radiation","Ядерна та радіаційна",41,"First time in history combat took place at a nuclear catastrophe site, disturbing radioactive soil and causing fires.","Вперше в історії бойові дії велися на місці ядерної катастрофи, що спричинило радіоактивні пожежі."
+"Seizure of Kakhovka HPP","Захоплення Каховської ГЕС",46.776,33.371,2022,"Hydraulic Terrorism","Гідрологічний тероризм",35,"Russia captured the dam controlling southern Ukraine's water supply, initiating a deliberate ecological disaster.","Захоплення ГЕС, що контролювала водопостачання півдня, стало початком екологічної катастрофи."
+"Oil Depot Fire in Kryachky","Пожежа на нафтобазі в Крячках",50.230,30.278,2022,"Chemical & Industrial","Хімічна та промислова",26,"Russian strike ignited a fuel depot, causing massive toxic emissions and soil contamination.","Удар по нафтобазі спричинив масштабні токсичні викиди та забруднення ґрунтів."
+"Occupation of Zaporizhzhia NPP","Окупація Запорізької АЕС",47.511,34.585,2022,"Nuclear & Radiation","Ядерна та радіаційна",49,"Military occupation of Europe's largest nuclear plant, mining the territory and violating all safety pillars.","Військова окупація найбільшої в Європі АЕС, мінування території та порушення всіх норм безпеки."
+"Strike on Kharkiv Institute of Physics","Удар по Харківському фізико-технічному інституту",50.093,36.257,2022,"Nuclear & Radiation","Ядерна та радіаційна",34,"Deliberate airstrike on a nuclear research facility containing highly enriched uranium.","Цілеспрямований авіаудар по ядерній установці з високозбагаченим ураном."
+"Flooding of Demydiv","Затоплення Демидова",50.729,30.334,2022,"Hydraulic Terrorism","Гідрологічний тероризм",27,"Dam detonated to slow Russian advance, sacrificing local ecosystems and flooding civilian areas.","Підрив дамби для зупинки наступу РФ ціною затоплення екосистем та сіл."
+"Ammonia Leak at Sumykhimprom","Витік аміаку на «Сумихімпромі»",50.887,34.808,2022,"Chemical & Industrial","Хімічна та промислова",26,"Airstrike ruptured an ammonia tank near a densely populated city.","Авіаудар пошкодив резервуар з аміаком поблизу густонаселеного міста."
+"Strikes on Kremenchuk Oil Refinery","Удари по Кременчуцькому НПЗ",49.123,33.456,2022,"Chemical & Industrial","Хімічна та промислова",27,"Multiple missile assaults destroyed civilian refining capacity, releasing toxic black smoke.","Серія ракетних ударів знищила нафтопереробний завод, спричинивши масштабне забруднення повітря."
+"Fires and Destruction of Kinburn Spit","Пожежі та руйнування Кінбурнської коси",46.516,31.761,2022,"Protected Areas","Заповідні території",32,"Unchecked fires in heavily mined occupied territory destroyed Europe's largest orchid meadow.","Пожежі на замінованій території знищили найбільше в Європі поле орхідей."
+"Strikes on Azot Chemical Plant","Удари по заводу «Азот»",48.938,38.482,2022,"Chemical & Industrial","Хімічна та промислова",29,"Targeted strikes on one of Europe's largest ammonia producers during urban combat.","Прицільні удари по одному з найбільших виробників аміаку в Європі під час міських боїв."
+"Mass Die-Off of Black Sea Dolphins Begins","Початок масової загибелі дельфінів Чорного моря",45.833,30.224,2022,"Marine & Aquatic","Морські екосистеми",43,"Naval sonar and underwater explosions caused acoustic trauma and mass death of cetaceans.","Військові сонари та вибухи спричинили акустичні травми і масову загибель дельфінів."
+"Destruction of Oskil Reservoir Dam","Знищення дамби Оскільського водосховища",49.186,37.409,2022,"Hydraulic Terrorism","Гідрологічний тероризм",31,"Deliberate draining of 76% of the reservoir during retreat, destroying an aquatic ecosystem built over 65 years.","Умисне зневоднення 76% водосховища під час відступу, знищення 65-річної екосистеми."
+"Strikes on Karachunivske Reservoir Dam","Удари по дамбі Карачунівського водосховища",48.016,33.250,2022,"Hydraulic Terrorism","Гідрологічний тероризм",28,"Hypersonic and ballistic missiles targeted dam infrastructure, causing downstream flooding.","Удари гіперзвуковими ракетами по дамбі спричинили затоплення територій нижче за течією."
+"Occupation of Askania-Nova","Окупація «Асканії-Нови»",46.452,33.870,2022,"Protected Areas","Заповідні території",37,"Military deployment and fires in Europe's largest virgin steppe reserve (UNESCO site).","Розміщення техніки та пожежі у найбільшому в Європі заповіднику цілинного степу."
+"Partial Destruction of Kakhovka Dam","Часткове руйнування Каховської ГЕС",46.776,33.371,2022,"Hydraulic Terrorism","Гідрологічний тероризм",29,"Retreating forces detonated the northern section, a precursor to the 2023 catastrophe.","Сили, що відступали, підірвали північну частину дамби."
+"Ammonia Leak from Tolyatti-Odesa Pipeline","Витік аміаку з трубопроводу Тольятті-Одеса",48.513,38.167,2023,"Chemical & Industrial","Хімічна та промислова",25,"Pipeline damage in Donetsk region released a toxic cloud forcing local evacuations.","Пошкодження трубопроводу на Донеччині спричинило витік токсичної хмари аміаку."
+"Destruction of Kakhovka HPP","Знищення Каховської ГЕС",46.776,33.371,2023,"Hydraulic Terrorism","Гідрологічний тероризм",50,"Total deliberate destruction of the dam. Ecosystem reset of the Lower Dnipro, catastrophic flooding.","Тотальне знищення дамби. Екосистемне обнулення Нижнього Дніпра, катастрофічне затоплення."
+"Destruction of Trypilska TPP","Знищення Трипільської ТЕС",50.138,30.767,2024,"Energy & Climate","Енергетика та клімат",33,"Massive missile barrage completely destroyed the Kyiv region's largest thermal power plant.","Масований ракетний удар повністю знищив найбільшу ТЕС Київського регіону."
+"Record Wildfires (965,000 ha)","Рекордні лісові пожежі (965 000 га)",48.000,36.000,2024,"Wildfires","Пожежі",42,"Frontline fires destroyed more forest than all EU member states combined in 2023.","Фронтові пожежі знищили більше лісів, ніж усі країни ЄС разом узяті у 2023 році."
+"Destruction of Ternivska Dam","Знищення Тернівської дамби",47.994,37.243,2024,"Hydraulic Terrorism","Гідрологічний тероризм",25,"Targeted destruction of Kurakhivske Reservoir dam, continuing the doctrine of hydraulic terrorism.","Знищення дамби Курахівського водосховища як продовження доктрини гідротероризму."
+"COP29 Wartime GHG Methodology","Методологія викидів ПГ від війни (COP29)",50.450,30.520,2024,"Energy & Climate","Енергетика та клімат",46,"First global presentation of a methodology calculating military GHG emissions (230 million tonnes CO2-eq).","Перша у світі методологія підрахунку викидів парникових газів від війни."
+"Kerch Strait Oil Tanker Catastrophe","Катастрофа нафтових танкерів у Керченській протоці",45.300,36.600,2024,"Marine & Aquatic","Морські екосистеми",42,"Storm broke aging Russian tankers, spilling 3,000 tonnes of heavy fuel oil into the strait.","Шторм розбив старі російські танкери, 3000 тонн мазуту вилилося у протоку."
+"90% of Ukraine's Wind Energy Destroyed","Знищено 90% вітроенергетики України",46.800,35.800,2025,"Energy & Climate","Енергетика та клімат",40,"Systematic destruction and theft of renewable energy infrastructure across occupied southern regions.","Систематичне знищення та розкрадання об'єктів відновлюваної енергетики на окупованому півдні."
+"Critical Incident at Zaporizhzhia NPP","Критичний інцидент на ЗАЕС",47.511,34.585,2025,"Nuclear & Radiation","Ядерна та радіаційна",49,"Plant lost all external power, relying entirely on diesel generators to prevent meltdown.","АЕС втратила зовнішнє живлення, покладаючись виключно на дизель-генератори."
+"50,000 Dolphins Dead","Загибель 50 000 дельфінів",44.500,32.500,2025,"Marine & Aquatic","Морські екосистеми",45,"Cumulative toll of Black Sea cetacean deaths reached 20% of the entire population.","Кумулятивна кількість загиблих китоподібних Чорного моря досягла 20% усієї популяції."
+"Systematic Soil Contamination","Систематичне забруднення ґрунтів",47.000,36.000,2025,"Soils & Agriculture","Ґрунти та сільське господарство",39,"Confirmed widespread heavy metal and explosive compound contamination across 20% of agricultural lands.","Підтверджено масштабне забруднення heavy металами та вибухівкою 20% сільгоспземель."
+"22% of Ukraine's Territory Mined","22% території України заміновано",49.000,37.000,2026,"Soils & Agriculture","Ґрунти та сільське господарство",45,"Over 133,000 sq km contaminated with mines, closing off vast natural and agricultural areas.","Понад 133 000 кв км заміновано, що унеможливлює використання природних та аграрних зон."
+"Oil Leak Near Melitopol (Azov Sea)","Витік нафтопродуктів біля Мелітополя (Азовське море)",46.500,35.500,2026,"Marine & Aquatic","Морські екосистеми",32,"Ongoing heavy fuel leakage from a sunken tanker threatens the highly vulnerable Azov Sea ecosystem.","Тривалий витік мазуту із затонулого танкера загрожує вразливій екосистемі Азовського моря."`;
+
+        const catConfig = {
+            "Nuclear & Radiation": { color: "#C94040", ua: "Ядерна та радіаційна" },
+            "Hydraulic Terrorism": { color: "#2E7BD9", ua: "Гідрологічний тероризм" },
+            "Chemical & Industrial": { color: "#D4861A", ua: "Хімічна та промислова" },
+            "Marine & Aquatic": { color: "#1A9E75", ua: "Морські екосистеми" },
+            "Protected Areas": { color: "#4F9422", ua: "Заповідні території" },
+            "Wildfires": { color: "#C85522", ua: "Пожежі" },
+            "Soils & Agriculture": { color: "#8B6645", ua: "Ґрунти та сільське господарство" },
+            "Energy & Climate": { color: "#6A63C8", ua: "Енергетика та клімат" },
+            "Water Supply": { color: "#4A95CC", ua: "Водопостачання" }
+        };
+
+        const eventSources = {
+            "Seizure of Crimean Nature Reserves":[
+                { title: "Environmental Impact of the Russian Occupation of Crimea", pub: "Wikipedia", url: "https://en.wikipedia.org/wiki/Environmental_impact_of_the_Russian_occupation_of_Crimea" },
+                { title: "Environmental Challenges of Occupation of Crimea", pub: "Autonomous Republic of Crimea Representative Office", url: "https://arcrimea.org/en/analytics/2023/06/13/environmental-challenges-of-occupation-of-crimea-and-other-forms-of-russian-aggress" }
+            ],
+            "Blockage of the North Crimean Canal":[
+                { title: "Fresh Water as a Weapon: How the Occupiers Dehydrate Crimea", pub: "UA Energy", url: "https://ua-energy.org/en/posts/12-11-2024-1f0f6a57-d56a-450d-a27e-8d357289d6ab" },
+                { title: "Inside Crimea: What Moscow-Kyiv Dispute Means for Water Crisis", pub: "Daily Sabah", url: "https://www.dailysabah.com/business/economy/inside-crimea-what-moscow-kyiv-dispute-means-for-water-crisis" }
+            ],
+            "Flooding of Donbas Coal Mines":[
+                { title: "Are Abandoned Mines Flooding in Ukraine's Donbas Region?", pub: "CEOBS", url: "https://ceobs.org/abandoned-mines-are-flooding-in-ukraines-donbass-region/" },
+                { title: "Flooded Mines of Donbass", pub: "EcoHubMap", url: "https://www.ecohubmap.com/hot-spot/flooded-mines-of-donbass/1qoupml6ghmtmz" }
+            ],
+            "Halt of Tolyatti–Odesa Ammonia Pipeline":[
+                { title: "Ammonia Pipeline 'Tolyatti–Odesa' Damaged in Donetsk Region", pub: "UNN", url: "https://unn.ua/en/news/ammonia-pipeline-tolyatti-odesa-damaged-in-donetsk-region-is-white-smoke-a-threat-to-life" },
+                { title: "Russia Accuses Ukraine of Damaging Ammonia Pipeline in Donetsk", pub: "Kyiv Post", url: "https://www.kyivpost.com/post/61798" }
+            ],
+            "Shelling of Donetsk Filtration Station":[
+                { title: "Ukraine: UN Experts Warn of Chemical Disaster and Water Safety Risk in Conflict", pub: "OHCHR", url: "https://www.ohchr.org/en/press-releases/2017/11/ukraine-un-experts-warn-chemical-disaster-and-water-safety-risk-conflict" },
+                { title: "Water Filtration Plants and Risks of a Chlorine Mass-Casualty Event in Donetsk", pub: "Bellingcat", url: "https://www.bellingcat.com/resources/case-studies/2017/03/10/water-filtration-plants-risks-chlorine-mass-casualty-event-donetsk/" }
+            ],
+            "Massive Wildfires in Luhansk Region":[
+                { title: "Climate Change, War and Forest Fires in Eastern Ukraine", pub: "openDemocracy", url: "https://www.opendemocracy.net/en/luhansk-forest-fires-climate-change-war-muratove/" },
+                { title: "Influence of Wildfires on the Conflict (2006–2022) in Eastern Ukraine", pub: "ScienceDirect", url: "https://www.sciencedirect.com/science/article/pii/S2352938524001046" }
+            ],
+            "Seizure of Chornobyl NPP":[
+                { title: "Russian Takeover of Chernobyl Was 'Very Dangerous': IAEA Chief", pub: "Al Jazeera", url: "https://www.aljazeera.com/news/2022/4/26/russian-takeover-of-chernobyl-was-very-dangerous-iaea-chief" },
+                { title: "Chornobyl Disaster Shelter No Longer Blocks Radiation and Needs Major Repair", pub: "The Guardian", url: "https://www.theguardian.com/world/2025/dec/06/chornobyl-disaster-shelter-no-longer-blocks-radiation-and-needs-major-repair-iaea" }
+            ],
+            "Seizure of Kakhovka HPP":[
+                { title: "Rapid Environmental Assessment of Kakhovka Dam Breach Ukraine, 2023", pub: "UNEP", url: "https://ukraine.un.org/en/250669-rapid-environmental-assessment-kakhovka-dam-breach-ukraine-2023" },
+                { title: "Potential Long-Term Impact of the Destruction of the Kakhovka Dam", pub: "UN Country Team Ukraine", url: "https://reliefweb.int/report/ukraine/potential-long-term-impact-destruction-kakhovka-dam-unct-joint-analytical-note-9-june-2023" }
+            ],
+            "Occupation of Zaporizhzhia NPP":[
+                { title: "IAEA Calls for Nuclear Safety Exclusion Zone Around Zaporizhzhia", pub: "World Nuclear News", url: "https://www.world-nuclear-news.org/Articles/IAEA-calls-for-nuclear-safety-exclusion-zone-aroun" },
+                { title: "The State of Ukraine's Zaporizhzhya Nuclear Power Plant", pub: "U.S. Department of Energy", url: "https://www.energy.gov/sites/default/files/2024-03/ZNPP%20Factsheet%20March%202024_final.pdf" }
+            ],
+            "Flooding of Demydiv":[
+                { title: "How 3 Years of War Have Ravaged Ukraine's Forests and the People Who Depend on Them", pub: "Grist", url: "https://grist.org/international/how-three-years-of-war-have-ravaged-ukraines-forests-and-the-people-who-depend-on-them/" },
+                { title: "Exploring Attacks on Oil Refineries and Watershed Degradation", pub: "Tearline.mil", url: "https://www.tearline.mil/public_page/environmental-impacts-ukraine" }
+            ],
+            "Ammonia Leak at Sumykhimprom":[
+                { title: "Ukraine: UN Experts Warn of Chemical Disaster and Water Safety Risk", pub: "OHCHR", url: "https://www.ohchr.org/en/press-releases/2017/11/ukraine-un-experts-warn-chemical-disaster-and-water-safety-risk-conflict" },
+                { title: "Russian Shelling Caused Ammonia Leak at Sumykhimprom", pub: "Ukrainska Pravda", url: "https://www.pravda.com.ua/eng/news/2022/03/21/7333197/" }
+            ],
+            "Strikes on Kremenchuk Oil Refinery":[
+                { title: "Kremenchuck Oil Refinery — CEOBS Damage Map", pub: "CEOBS", url: "https://ceobs.org/ukraine-damage-map-kremenchuck-oil-refinery/" },
+                { title: "Investigation into Attacks on the Kremenchuk Oil Refinery", pub: "Ukrainian Archive", url: "https://ukrainianarchive.org/en/investigations/investigation-into-attacks-on-the-kremenchuk-oil-refinery/" }
+            ],
+            "Fires and Destruction of Kinburn Spit":[
+                { title: "Russian Invaders Destroy Unique Kinburn Spit, Damaging up to 4 Million Trees", pub: "We Are Ukraine / Ministry of Environment", url: "https://www.weareukraine.info/russian-invaders-destroy-unique-kinburn-spit-damaging-up-to-4-million-trees/" },
+                { title: "Fires Erupt as Occupiers Turn Kinburn Spit into War Zone", pub: "NV Ukraine", url: "https://english.nv.ua/nation/russian-troops-turn-kinburn-spit-into-war-zone-fires-raging-in-reserve-50452210.html" }
+            ],
+            "Strikes on Azot Chemical Plant":[
+                { title: "Ukraine: UN Experts Warn of Chemical Disaster and Water Safety Risk", pub: "OHCHR", url: "https://www.ohchr.org/en/press-releases/2017/11/ukraine-un-experts-warn-chemical-disaster-and-water-safety-risk-conflict" },
+                { title: "In Eastern Ukraine, One Misplaced Artillery Shell Could Cause a Chernobyl-Scale Disaster", pub: "Defense One", url: "https://www.defenseone.com/threats/2017/12/eastern-ukraine-one-misplaced-artillery-shell-could-cause-chernobyl-scale-disaster/144742/" }
+            ],
+            "Mass Die-Off of Black Sea Dolphins Begins":[
+                { title: "How the War in Ukraine Is Killing Marine Mammals", pub: "BBC Future", url: "https://www.bbc.com/future/article/20221222-how-the-war-in-ukraine-is-killing-marine-mammals" },
+                { title: "Russian Ecocide: Thousands of Dolphins Die in the Black Sea From Russian Attacks", pub: "Bihus.Info", url: "https://bihus.info/russian-ecocide-thousands-of-dolphins-die-in-the-black-sea-from-russian-attacks/" }
+            ],
+            "Destruction of Oskil Reservoir Dam":[
+                { title: "Oskil Reservoir Dam Destroyed — Case Against Two Russian Generals Sent to Court", pub: "Army Inform", url: "https://armyinform.com.ua/en/2026/02/19/oskil-reservoir-dam-destroyed-case-against-two-russian-generals-sent-to-court/" },
+                { title: "Two Russian Generals Charged with Causing Ecocide in Kharkiv Oblast", pub: "Gwara Media", url: "https://gwaramedia.com/en/two-russias-general-charged-with-causing-ecocide-in-kharkiv-oblast/" }
+            ],
+            "Occupation of Askania-Nova":[
+                { title: "Fires in Askania-Nova: Consequences of Military Occupation of a Reserve", pub: "UWEC Work Group", url: "https://uwecworkgroup.info/fires-in-askania-nova-consequences-of-military-occupation-of-a-reserve/" },
+                { title: "More Than 7,000 Hectares Burned Down on the Territory of Askania-Nova", pub: "Hromadske Radio", url: "https://hromadske.radio/en/news/2024/08/20/more-than-7-000-hectares-burned-down-on-the-territory-of-askania-nova-director-of-the" }
+            ],
+            "Ammonia Leak from Tolyatti-Odesa Pipeline":[
+                { title: "Ammonia Pipeline 'Tolyatti–Odesa' Damaged in Donetsk Region", pub: "UNN", url: "https://unn.ua/en/news/ammonia-pipeline-tolyatti-odesa-damaged-in-donetsk-region-is-white-smoke-a-threat-to-life" },
+                { title: "Russia Accuses Ukraine of Damaging Ammonia Pipeline in Donetsk", pub: "Kyiv Post", url: "https://www.kyivpost.com/post/61798" }
+            ],
+            "Destruction of Kakhovka HPP":[
+                { title: "Environmental Effects of the Kakhovka Dam Destruction by Warfare in Ukraine", pub: "Science", url: "https://www.science.org/doi/10.1126/science.adn8655" },
+                { title: "Rapid Environmental Assessment of Kakhovka Dam Breach Ukraine, 2023", pub: "UNEP / UN Ukraine", url: "https://ukraine.un.org/en/250669-rapid-environmental-assessment-kakhovka-dam-breach-ukraine-2023" }
+            ],
+            "Record Wildfires (965,000 ha)":[
+                { title: "Ukraine Hit by Record-Breaking Wildfires in 2024", pub: "European Commission JRC", url: "https://joint-research-centre.ec.europa.eu/jrc-news-and-updates/ukraine-hit-record-breaking-wildfires-2024-2025-03-25_en" },
+                { title: "War Ignited Record-Breaking Wildfires in Ukraine Last Year, Scientists Say", pub: "Reuters", url: "https://www.reuters.com/world/europe/war-ignited-record-breaking-wildfires-ukraine-last-year-scientists-say-2025-03-26/" }
+            ],
+            "COP29 Wartime GHG Methodology":[
+                { title: "At COP29, Ukraine Presented a Methodology for Calculating Climate Damage from War", pub: "Ecoaction NGO", url: "https://en.ecoaction.org.ua/cop29-ukraine-presented-methodology-calculating-climate-damage-from-war.html" },
+                { title: "Methodological Guidance to Estimate Conflict-Related GHG Emissions", pub: "Ecoaction / IGGAW", url: "https://en.ecoaction.org.ua/conflict-related-emissions-guidance.html" }
+            ],
+            "Kerch Strait Oil Tanker Catastrophe":[
+                { title: "Russia Suffering 'Environmental Catastrophe' After Oil Spill in Kerch Strait", pub: "BBC", url: "https://www.bbc.com/news/articles/c23ngk5vgmpo" },
+                { title: "Russian Tankers in the Kerch Strait: A New Environmental Disaster", pub: "Greenpeace Ukraine", url: "https://www.greenpeace.org/ukraine/en/news/3135/russian-militarisation-of-the-black-sea-and-azov-threatens-with-new-environmental" }
+            ],
+            "Critical Incident at Zaporizhzhia NPP":[
+                { title: "IAEA Director General Statement on Situation in Ukraine — Update 341", pub: "IAEA", url: "http://www.iaea.org/newscenter/pressreleases/update-341-iaea-director-general-statement-on-situation-in-ukraine" },
+                { title: "Two Years of IAEA Continued Presence at Zaporizhzhya NPP", pub: "IAEA", url: "https://www.iaea.org/sites/default/files/documents/two-years-of-iaea-continued-presence-at-the-zaporizhzhaya-nuclear-power-plant" }
+            ],
+            "50,000 Dolphins Dead":[
+                { title: "How the War in Ukraine Is Killing Marine Mammals", pub: "BBC Future", url: "https://www.bbc.com/future/article/20221222-how-the-war-in-ukraine-is-killing-marine-mammals" },
+                { title: "About 50,000 Dolphins Have Died in Black Sea Because of Russian Aggression", pub: "Ukrainska Pravda", url: "https://www.pravda.com.ua/eng/news/2022/10/23/7373104/" }
+            ],
+            "22% of Ukraine's Territory Mined":[
+                { title: "Landmines: Use, Contamination and Civilian Harm in Ukraine — Factsheet 2026", pub: "Handicap International", url: "https://reliefweb.int/report/ukraine/landmines-use-contamination-and-civilian-harm-ukraine-factsheet-2026-enuk" },
+                { title: "'Every Day There's New Contamination': Mine Clearing in Ukraine", pub: "UN News", url: "https://news.un.org/en/audio/2026/04/1167238" }
+            ]
+        };
+
+        const i18n = {
+            en: {
+                title: "Environmental War", cats: "Categories", all: "All", none: "None",
+                yearRange: "Year Range", startYear: "Start Year", endYear: "End Year",
+                back: "Back to Overview",
+                sourcesTitle: "SOURCES",
+                basemap: "Dark / Satellite"
+            },
+            ua: {
+                title: "Екологічна війна", cats: "Категорії", all: "Усі", none: "Жодного",
+                yearRange: "Діапазон років", startYear: "Початковий рік", endYear: "Кінцевий рік",
+                back: "Повернутися до огляду",
+                sourcesTitle: "ДЖЕРЕЛА",
+                basemap: "Темна / Супутник"
+            }
+        };
+
+        let lang = 'en';
+        let events =[];
+        let activeCats = new Set(Object.keys(catConfig));
+        let selectedEvent = null;
+
+        const tlStart = 2014;
+        const tlEnd = 2026.99;
+        const tlRange = tlEnd - tlStart;
+        let progress = 1; 
+        let isPlaying = false;
+        let playSpeed = 1;
+        let lastTime = null;
+        let triggeredEvents = new Set();
+        let activeAnimations =[]; 
+        let animReq;
+
+        let isDraggingTimeline = false;
+
+        const map = L.map('map', {
+            center:[48.5, 32.0], zoom: 6, minZoom: 5, maxZoom: 14,
+            maxBounds: [[43.0, 21.0],[53.5, 41.5]], zoomControl: false, preferCanvas: false
+        });
+        
+        L.control.zoom({position: 'topleft'}).addTo(map);
+
+        const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        const esriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+
+        let isManualOverride = false;
+        let activeLayer = 'dark';
+
+        map.on('zoomend', () => { if(!isManualOverride) switchBasemap(map.getZoom() > 8); });
+        
+        map.on('click', () => {
+            if (selectedEvent) closeDetails();
+        });
+
+        document.getElementById('btn-basemap').addEventListener('click', () => {
+            isManualOverride = true; switchBasemap(activeLayer === 'dark');
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if(e.code === 'Space') {
+                e.preventDefault();
+                togglePlay();
+            } else if (e.code === 'ArrowRight') {
+                e.preventDefault();
+                nextEvent();
+            } else if (e.code === 'ArrowLeft') {
+                e.preventDefault();
+                prevEvent();
+            } else if (e.code === 'KeyR' || e.code === 'KeyK') {
+                e.preventDefault();
+                resetTimeline();
+            }
+        });
+
+        function switchBasemap(toSatellite) {
+            if(toSatellite && activeLayer !== 'satellite') {
+                map.removeLayer(cartoDark); map.addLayer(esriImagery); activeLayer = 'satellite'; updateMarkerStyles();
+            } else if(!toSatellite && activeLayer !== 'dark') {
+                map.removeLayer(esriImagery); map.addLayer(cartoDark); activeLayer = 'dark'; updateMarkerStyles();
+            }
+        }
+
+        function initApp() {
+            const parsed = Papa.parse(csvData.trim(), { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
+            
+            const locGroups = {};
+            parsed.forEach(row => {
+                const key = row.latitude.toFixed(2) + ',' + row.longitude.toFixed(2);
+                if (!locGroups[key]) locGroups[key] =[];
+                locGroups[key].push(row);
+            });
+
+            Object.values(locGroups).forEach(group => {
+                if (group.length > 1) {
+                    group.sort((a,b) => a.year - b.year);
+                    const r = 0.08; 
+                    group.forEach((row, i) => {
+                        const angle = (i / group.length) * Math.PI * 2;
+                        row.latitude += Math.sin(angle) * r;
+                        row.longitude += Math.cos(angle) * r * 1.5; 
+                    });
+                }
+            });
+
+            const yearCounts = {};
+            parsed.forEach(row => yearCounts[row.year] = (yearCounts[row.year] || 0) + 1);
+            const yearCounters = {};
+
+            parsed.forEach(row => {
+                const c = yearCounters[row.year] || 0;
+                const offset = yearCounts[row.year] > 1 ? c / yearCounts[row.year] : 0;
+                row.timelineYear = row.year + offset;
+                yearCounters[row.year] = c + 1;
+
+                const color = catConfig[row.category].color;
+                const radius = Math.max(5, (row.score - 15) / 2.8);
+                
+                const marker = L.circleMarker([row.latitude, row.longitude], {
+                    radius: radius, color: '#ffffff', weight: 1.5, opacity: 0.9,
+                    fillColor: color, fillOpacity: 0.85,
+                    className: 'map-marker'
+                });
+                
+                marker.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    selectEvent(row);
+                });
+
+                row.marker = marker;
+                row.extraRings =[];
+
+                if(row.score >= 45) {
+                    const rIcon = L.divIcon({ className: 'empty-class', html: `<div class="pulse-ring" style="width:${radius*2 + 14}px; height:${radius*2 + 14}px; border: 2px solid ${color};"></div>` });
+                    row.extraRings.push(L.marker([row.latitude, row.longitude], {icon: rIcon, interactive: false}));
+                }
+
+                if(row.score === 50) {
+                    const maxIcon = L.divIcon({ className: 'empty-class', html: `<div class="max-ring" style="width:${radius*2 + 22}px; height:${radius*2 + 22}px; border: 2px solid ${color}; opacity: 0.15;"></div>` });
+                    row.extraRings.push(L.marker([row.latitude, row.longitude], {icon: maxIcon, interactive: false}));
+                }
+                
+                events.push(row);
+            });
+
+            events.sort((a,b) => a.timelineYear - b.timelineYear);
+            buildCategoryFilter();
+            buildTimelineAxis();
+            updatePanelFilters();
+            updateTimelineUI();
+        }
+
+        function buildCategoryFilter() {
+            const list = document.getElementById('cat-list');
+            list.innerHTML = '';
+            Object.keys(catConfig).forEach(c => {
+                const el = document.createElement('div');
+                el.className = 'cat-chip active';
+                el.innerHTML = `<div class="cat-dot" style="background:${catConfig[c].color}"></div><span class="c-name">${lang==='ua' ? catConfig[c].ua : c}</span>`;
+                el.onclick = () => {
+                    if(activeCats.has(c)) { activeCats.delete(c); el.classList.remove('active'); }
+                    else { activeCats.add(c); el.classList.add('active'); }
+                    updatePanelFilters();
+                };
+                list.appendChild(el);
+            });
+        }
+
+        function setAllCats(state) {
+            const chips = document.querySelectorAll('.cat-chip');
+            if(state) {
+                Object.keys(catConfig).forEach(c => activeCats.add(c));
+                chips.forEach(c => c.classList.add('active'));
+            } else {
+                activeCats.clear();
+                chips.forEach(c => c.classList.remove('active'));
+            }
+            updatePanelFilters();
+        }
+
+        function updatePanelFilters() {
+            const finalYMin = parseInt(document.getElementById('year-min').value);
+            const finalYMax = parseInt(document.getElementById('year-max').value);
+
+            if(finalYMin > finalYMax) document.getElementById('year-max').value = finalYMin;
+            
+            document.getElementById('year-min-val').innerText = document.getElementById('year-min').value;
+            document.getElementById('year-max-val').innerText = document.getElementById('year-max').value;
+
+            events.forEach(e => {
+                e.panelVisible = activeCats.has(e.category) && 
+                                 e.year >= finalYMin && e.year <= finalYMax;
+            });
+
+            updateTimelineDots();
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const currentTimelineYear = tlStart + (progress * tlRange);
+
+            events.forEach(e => {
+                const visible = e.panelVisible && (e.timelineYear <= currentTimelineYear);
+                e.visible = visible;
+
+                if(visible) {
+                    if(!map.hasLayer(e.marker)) {
+                        e.marker.addTo(map);
+                        if(e.extraRings) e.extraRings.forEach(r => r.addTo(map));
+                    }
+                } else {
+                    if(map.hasLayer(e.marker)) {
+                        map.removeLayer(e.marker);
+                        if(e.extraRings) e.extraRings.forEach(r => map.removeLayer(r));
+                    }
+                }
+            });
+
+            updateMarkerStyles();
+            if(selectedEvent && !selectedEvent.visible) closeDetails();
+        }
+
+        function updateMarkerStyles() {
+            const isDark = activeLayer === 'dark';
+            events.forEach(e => {
+                if(e.marker) e.marker.setStyle({ color: isDark ? '#ffffff' : '#222222', weight: 1.5 });
+            });
+        }
+
+        function selectEvent(e) {
+            selectedEvent = e;
+            document.getElementById('right-panel').classList.add('active-panel');
+            
+            const color = catConfig[e.category].color;
+            document.getElementById('det-cat').style.border = `1px solid ${color}`;
+            document.getElementById('det-dot').style.background = color;
+            document.getElementById('det-cat-name').innerText = lang === 'ua' ? catConfig[e.category].ua : e.category;
+            
+            document.getElementById('det-year').innerText = e.year;
+            document.getElementById('det-name').innerText = lang === 'ua' ? e.name_ua : e.name; 
+            document.getElementById('det-desc').innerText = lang === 'ua' ? e.description_ua : e.description_en;
+
+            const sources = eventSources[e.name];
+            const srcContainer = document.getElementById('det-sources-container');
+            const srcDiv = document.getElementById('det-sources');
+            if (sources && sources.length > 0) {
+                srcContainer.style.display = 'block';
+                srcDiv.innerHTML = sources.map(src => `
+                    <div class="source-item">
+                        <a href="${src.url}" target="_blank">${src.title}</a>
+                        <div class="source-pub">${src.pub}</div>
+                    </div>
+                `).join('');
+            } else {
+                srcContainer.style.display = 'none';
+            }
+        }
+
+        function closeDetails() {
+            selectedEvent = null;
+            document.getElementById('right-panel').classList.remove('active-panel');
+        }
+
+        function buildTimelineAxis() {
+            const track = document.getElementById('tl-track');
+            for(let y=2014; y<=2026; y+=2) {
+                const el = document.createElement('div');
+                el.className = 'timeline-year-lbl';
+                
+                if ((y - 2014) % 4 !== 0) {
+                    el.classList.add('hide-mobile');
+                }
+                
+                el.innerText = y;
+                el.style.left = `${((y-tlStart)/tlRange)*100}%`;
+                track.appendChild(el);
+            }
+        }
+
+        function updateTimelineDots() {
+            document.querySelectorAll('.timeline-dot').forEach(el => el.remove());
+            const track = document.getElementById('tl-track');
+            events.forEach(e => {
+                if(!e.panelVisible) return;
+                const dot = document.createElement('div');
+                dot.className = 'timeline-dot';
+                dot.style.left = `${((e.timelineYear-tlStart)/tlRange)*100}%`;
+                dot.style.background = catConfig[e.category].color;
+                track.appendChild(dot);
+            });
+        }
+
+        function setSpeed(s) {
+            playSpeed = s;
+            document.querySelectorAll('.speed-controls button').forEach(b => b.classList.remove('active'));
+            if(s===0.5) document.getElementById('spd-05').classList.add('active');
+            if(s===1) document.getElementById('spd-1').classList.add('active');
+            if(s===2) document.getElementById('spd-2').classList.add('active');
+        }
+
+        function clearAnimations() {
+            activeAnimations.forEach(anim => {
+                clearTimeout(anim.timer);
+                if (map.hasLayer(anim.marker)) map.removeLayer(anim.marker);
+            });
+            activeAnimations =[];
+        }
+
+        function syncTriggeredEvents() {
+            const currentTimelineYear = tlStart + (progress * tlRange);
+            triggeredEvents.clear();
+            events.forEach((e, i) => {
+                if(e.timelineYear <= currentTimelineYear) {
+                    triggeredEvents.add(i);
+                }
+            });
+        }
+
+        function seekTimelineStart(event) {
+            isDraggingTimeline = true;
+            updateTimelineFromEvent(event);
+            
+            window.addEventListener('mousemove', dragTimeline);
+            window.addEventListener('mouseup', stopDragTimeline);
+            window.addEventListener('touchmove', dragTimeline, {passive: false});
+            window.addEventListener('touchend', stopDragTimeline);
+        }
+
+        function dragTimeline(event) {
+            if (!isDraggingTimeline) return;
+            if(event.type === 'touchmove') event.preventDefault(); 
+            updateTimelineFromEvent(event);
+        }
+
+        function stopDragTimeline(event) {
+            isDraggingTimeline = false;
+            window.removeEventListener('mousemove', dragTimeline);
+            window.removeEventListener('mouseup', stopDragTimeline);
+            window.removeEventListener('touchmove', dragTimeline);
+            window.removeEventListener('touchend', stopDragTimeline);
+        }
+
+        function updateTimelineFromEvent(event) {
+            const track = document.getElementById('tl-track');
+            const rect = track.getBoundingClientRect();
+            
+            let clientX;
+            if (event.touches && event.touches.length > 0) {
+                clientX = event.touches[0].clientX;
+            } else {
+                clientX = event.clientX;
+            }
+
+            let p = (clientX - rect.left) / rect.width;
+            p = Math.max(0, Math.min(1, p));
+            progress = p;
+            
+            clearAnimations(); 
+            syncTriggeredEvents(); 
+            
+            updateTimelineUI();
+            applyFilters();
+        }
+
+        function resetTimeline() {
+            progress = 0;
+            isPlaying = false;
+            document.getElementById('tl-play-icon').innerText = '▶';
+            cancelAnimationFrame(animReq);
+            lastTime = null;
+            
+            clearAnimations();
+            triggeredEvents.clear();
+            
+            updateTimelineUI();
+            applyFilters();
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            document.getElementById('tl-play-icon').innerText = isPlaying ? '⏸' : '▶';
+            if(isPlaying) {
+                if(progress >= 1) { progress = 0; triggeredEvents.clear(); }
+                lastTime = performance.now();
+                animReq = requestAnimationFrame(playLoop);
+            }
+        }
+
+        function playLoop(time) {
+            if(!isPlaying) return;
+            const deltaSec = (time - lastTime) / 1000;
+            lastTime = time;
+            
+            progress += (deltaSec * playSpeed) / 40;
+            
+            if(progress >= 1) {
+                progress = 1;
+                isPlaying = false;
+                document.getElementById('tl-play-icon').innerText = '▶';
+            }
+            
+            updateTimelineUI();
+            applyFilters();
+            checkTimelineEvents();
+            
+            if(isPlaying) animReq = requestAnimationFrame(playLoop);
+        }
+
+        function updateTimelineUI() {
+            document.getElementById('tl-playhead').style.left = `${progress*100}%`;
+            
+            const currentTimelineYear = tlStart + (progress * tlRange);
+            const y = Math.floor(currentTimelineYear);
+            let mIdx = Math.floor((currentTimelineYear % 1) * 12);
+            if (mIdx < 0) mIdx = 0; if (mIdx > 11) mIdx = 11;
+            
+            const monthsEN =["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const monthsUA =["Січ", "Лют", "Бер", "Квіт", "Трав", "Черв", "Лип", "Серп", "Вер", "Жовт", "Лист", "Груд"];
+            const mName = lang === 'ua' ? monthsUA[mIdx] : monthsEN[mIdx];
+            
+            document.getElementById('tl-playhead').setAttribute('data-year', `${mName} ${y}`);
+        }
+
+        function checkTimelineEvents() {
+            const currentTimelineYear = tlStart + (progress * tlRange);
+            events.forEach((e, idx) => {
+                if(e.visible && !triggeredEvents.has(idx) && currentTimelineYear >= e.timelineYear) {
+                    triggeredEvents.add(idx);
+                    fireTimelineEvent(e);
+                }
+            });
+        }
+
+        function nextEvent() {
+            if (isPlaying) togglePlay(); 
+            const currentTimelineYear = tlStart + (progress * tlRange);
+            const sorted = events.filter(e => e.panelVisible).sort((a,b) => a.timelineYear - b.timelineYear);
+            const nextE = sorted.find(e => e.timelineYear > currentTimelineYear + 0.005);
+            
+            if(nextE) {
+                progress = (nextE.timelineYear - tlStart) / tlRange;
+                clearAnimations();
+                triggeredEvents.clear();
+                events.forEach((e, i) => { if (e.timelineYear < nextE.timelineYear - 0.001) triggeredEvents.add(i); });
+                
+                updateTimelineUI();
+                applyFilters();
+                checkTimelineEvents(); 
+            } else {
+                progress = 1;
+                clearAnimations();
+                syncTriggeredEvents();
+                updateTimelineUI();
+                applyFilters();
+            }
+        }
+
+        function prevEvent() {
+            if (isPlaying) togglePlay();
+            const currentTimelineYear = tlStart + (progress * tlRange);
+            const sorted = events.filter(e => e.panelVisible).sort((a,b) => a.timelineYear - b.timelineYear);
+            const prevE = [...sorted].reverse().find(e => e.timelineYear < currentTimelineYear - 0.005);
+            
+            if(prevE) {
+                progress = (prevE.timelineYear - tlStart) / tlRange;
+                clearAnimations();
+                triggeredEvents.clear();
+                events.forEach((e, i) => { if (e.timelineYear < prevE.timelineYear - 0.001) triggeredEvents.add(i); });
+                
+                updateTimelineUI();
+                applyFilters();
+                checkTimelineEvents();
+            } else {
+                progress = 0;
+                clearAnimations();
+                triggeredEvents.clear();
+                updateTimelineUI();
+                applyFilters();
+            }
+        }
+
+        function fireTimelineEvent(e) {
+            const color = catConfig[e.category].color;
+            const radius = Math.max(5, (e.score - 15) / 2.8);
+
+            const rippleIcon = L.divIcon({
+                className: 'empty-class',
+                html: `<div class="timeline-ripple" style="width:${radius*2 + 8}px; height:${radius*2 + 8}px; background:${color};"></div>`
+            });
+            const rippleMarker = L.marker([e.latitude, e.longitude], {icon: rippleIcon, interactive: false}).addTo(map);
+            const rTimer = setTimeout(() => { 
+                if(map.hasLayer(rippleMarker)) map.removeLayer(rippleMarker); 
+                activeAnimations = activeAnimations.filter(a => a.marker !== rippleMarker);
+            }, 1000);
+            activeAnimations.push({marker: rippleMarker, timer: rTimer});
+
+            const nameStr = lang === 'ua' ? e.name_ua : e.name;
+            const catStr = lang === 'ua' ? catConfig[e.category].ua : e.category;
+            
+            const toastIcon = L.divIcon({
+                className: 'custom-toast',
+                iconAnchor:[0, 0],
+                html: `<div class="toast-content" style="border-top: 3px solid ${color}">
+                          <div class="toast-title">${nameStr}</div>
+                          <div class="toast-cat">${catStr}</div>
+                       </div>`
+            });
+            const tMarker = L.marker([e.latitude, e.longitude], {icon: toastIcon, interactive: false}).addTo(map);
+            const tTimer = setTimeout(() => { 
+                if(map.hasLayer(tMarker)) map.removeLayer(tMarker); 
+                activeAnimations = activeAnimations.filter(a => a.marker !== tMarker);
+            }, 2500);
+            activeAnimations.push({marker: tMarker, timer: tTimer});
+        }
+
+        function setLang(l) {
+            lang = l;
+            document.getElementById('btn-en').classList.toggle('active', l==='en');
+            document.getElementById('btn-ua').classList.toggle('active', l==='ua');
+            
+            const t = i18n[l];
+            document.getElementById('ui-title').innerText = t.title;
+            document.getElementById('ui-filter-cats').innerText = t.cats;
+            document.getElementById('ui-all').innerText = t.all;
+            document.getElementById('ui-none').innerText = t.none;
+            document.getElementById('ui-filter-year').innerText = t.yearRange;
+            document.getElementById('ui-year-min').innerText = t.startYear;
+            document.getElementById('ui-year-max').innerText = t.endYear;
+            document.getElementById('ui-sources-title').innerText = t.sourcesTitle;
+            document.getElementById('ui-back').innerText = t.back;
+            document.getElementById('btn-basemap').innerText = t.basemap; 
+
+            const chips = document.querySelectorAll('#cat-list .c-name');
+            const keys = Object.keys(catConfig);
+            chips.forEach((c, i) => c.innerText = l==='ua' ? catConfig[keys[i]].ua : keys[i]);
+
+            updateTimelineUI();
+            if(selectedEvent) selectEvent(selectedEvent);
+        }
+
+        function toggleMenu() { document.getElementById('left-panel').classList.toggle('open'); }
+
+        window.onload = initApp;
+
+    </script>
+</body>
+</html>
